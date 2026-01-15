@@ -22,6 +22,7 @@ type Config struct {
 	StatusCode       string
 	Batch            bool
 	NumSpanLinks     int
+	AddTraceIDAttr   bool
 
 	SpanDuration time.Duration
 }
@@ -45,6 +46,7 @@ func (c *Config) Flags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.Batch, "batch", c.Batch, "Whether to batch traces")
 	fs.IntVar(&c.NumSpanLinks, "span-links", c.NumSpanLinks, "Number of span links to generate for each span")
 	fs.DurationVar(&c.SpanDuration, "span-duration", c.SpanDuration, "The duration of each generated span.")
+	fs.BoolVar(&c.AddTraceIDAttr, "add-traceid-attr", c.AddTraceIDAttr, "Whether to add traceId as an attribute to each span")
 }
 
 // SetDefaults sets the default values for the configuration
@@ -61,6 +63,7 @@ func (c *Config) SetDefaults() {
 	c.Batch = true
 	c.NumSpanLinks = 0
 	c.SpanDuration = 123 * time.Microsecond
+	c.AddTraceIDAttr = false
 }
 
 // Validate validates the test scenario parameters.

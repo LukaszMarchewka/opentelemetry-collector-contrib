@@ -37,6 +37,7 @@ type worker struct {
 	loadSize         int                   // desired minimum size in MB of string data for each generated trace
 	spanDuration     time.Duration         // duration of generated spans
 	numSpanLinks     int                   // number of span links to generate per span
+	addTraceIDAttr   bool                  // whether to add traceId as an attribute to spans
 	logger           *zap.Logger
 	allowFailures    bool                // whether to continue on export failures
 	spanContexts     []trace.SpanContext // collection of span contexts for linking
@@ -120,6 +121,12 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 			trace.WithLinks(parentLinks...),
 		)
 		sp.SetAttributes(telemetryAttributes...)
+
+		// Add traceId as an attribute if enabled
+		if w.addTraceIDAttr {
+			sp.SetAttributes(attribute.String("traceId", sp.SpanContext().TraceID().String()))
+		}
+
 		for j := 0; j < w.loadSize; j++ {
 			sp.SetAttributes(config.CreateLoadAttribute(fmt.Sprintf("load-%v", j), 1))
 		}
@@ -155,6 +162,11 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 				trace.WithLinks(childLinks...),
 			)
 			child.SetAttributes(telemetryAttributes...)
+
+			// Add traceId as an attribute if enabled
+			if w.addTraceIDAttr {
+				child.SetAttributes(attribute.String("traceId", child.SpanContext().TraceID().String()))
+			}
 
 			// Store the child span context for potential future linking
 			w.addSpanContext(child.SpanContext())

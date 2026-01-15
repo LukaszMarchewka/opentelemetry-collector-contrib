@@ -90,6 +90,12 @@ Or, to generate traces continuously every 10 seconds:
 telemetrygen traces --otlp-insecure --continuous --rate 0.1
 ```
 
+Or, to generate traces with traceId as an attribute on each span:
+
+```console
+telemetrygen traces --otlp-insecure --traces 1 --add-traceid-attr
+```
+
 To send traces in secure connection, see [examples/secure-tracing](../../examples/secure-tracing/)
 
 Check `telemetrygen traces --help` for all the options.
