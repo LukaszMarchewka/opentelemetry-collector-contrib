@@ -96,6 +96,18 @@ Or, to generate traces with traceId as an attribute on each span:
 telemetrygen traces --otlp-insecure --traces 1 --add-traceid-attr
 ```
 
+Or, to generate traces with a random attribute (value from 0 to 99):
+
+```console
+telemetrygen traces --otlp-insecure --traces 5 --random-attr-max 100
+```
+
+Or, to generate traces with both traceId and random attributes:
+
+```console
+telemetrygen traces --otlp-insecure --traces 3 --add-traceid-attr --random-attr-max 50
+```
+
 To send traces in secure connection, see [examples/secure-tracing](../../examples/secure-tracing/)
 
 Check `telemetrygen traces --help` for all the options.
