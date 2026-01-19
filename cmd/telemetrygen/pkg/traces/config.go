@@ -16,14 +16,15 @@ import (
 // Config describes the test scenario.
 type Config struct {
 	config.Config
-	NumTraces          int
-	NumChildSpans      int
-	PropagateContext   bool
-	StatusCode         string
-	Batch              bool
-	NumSpanLinks       int
-	AddTraceIDAttr     bool
-	RandomAttrMaxValue int
+	NumTraces           int
+	NumChildSpans       int
+	PropagateContext    bool
+	StatusCode          string
+	Batch               bool
+	NumSpanLinks        int
+	AddTraceIDAttr      bool
+	Random1AttrMaxValue int
+	Random2AttrMaxValue int
 
 	SpanDuration time.Duration
 }
@@ -48,7 +49,8 @@ func (c *Config) Flags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.NumSpanLinks, "span-links", c.NumSpanLinks, "Number of span links to generate for each span")
 	fs.DurationVar(&c.SpanDuration, "span-duration", c.SpanDuration, "The duration of each generated span.")
 	fs.BoolVar(&c.AddTraceIDAttr, "add-traceid-attr", c.AddTraceIDAttr, "Whether to add traceId as an attribute to each span")
-	fs.IntVar(&c.RandomAttrMaxValue, "random-attr-max", c.RandomAttrMaxValue, "If set, adds a 'random' attribute with a random number from 0 to this value (exclusive). If not set or 0, the attribute is not added.")
+	fs.IntVar(&c.Random1AttrMaxValue, "random1-attr-max", c.Random1AttrMaxValue, "If set, adds a 'random1' attribute with a random number from 0 to this value (exclusive). If not set or 0, the attribute is not added.")
+	fs.IntVar(&c.Random2AttrMaxValue, "random2-attr-max", c.Random2AttrMaxValue, "If set, adds a 'random2' attribute with a random number from 0 to this value (exclusive). If not set or 0, the attribute is not added.")
 }
 
 // SetDefaults sets the default values for the configuration
@@ -66,7 +68,8 @@ func (c *Config) SetDefaults() {
 	c.NumSpanLinks = 0
 	c.SpanDuration = 123 * time.Microsecond
 	c.AddTraceIDAttr = false
-	c.RandomAttrMaxValue = 0
+	c.Random1AttrMaxValue = 0
+	c.Random2AttrMaxValue = 0
 }
 
 // Validate validates the test scenario parameters.

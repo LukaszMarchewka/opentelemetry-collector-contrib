@@ -26,23 +26,24 @@ import (
 )
 
 type worker struct {
-	running            *atomic.Bool          // pointer to shared flag that indicates it's time to stop the test
-	numTraces          int                   // how many traces the worker has to generate (only when duration==0)
-	numChildSpans      int                   // how many child spans the worker has to generate per trace
-	propagateContext   bool                  // whether the worker needs to propagate the trace context via HTTP headers
-	statusCode         codes.Code            // the status code set for the child and parent spans
-	totalDuration      types.DurationWithInf // how long to run the test for (overrides `numTraces`)
-	limitPerSecond     rate.Limit            // how many spans per second to generate
-	wg                 *sync.WaitGroup       // notify when done
-	loadSize           int                   // desired minimum size in MB of string data for each generated trace
-	spanDuration       time.Duration         // duration of generated spans
-	numSpanLinks       int                   // number of span links to generate per span
-	addTraceIDAttr     bool                  // whether to add traceId as an attribute to spans
-	randomAttrMaxValue int                   // max value for random attribute (0 = disabled)
-	logger             *zap.Logger
-	allowFailures      bool                // whether to continue on export failures
-	spanContexts       []trace.SpanContext // collection of span contexts for linking
-	spanContextsMu     sync.RWMutex        // mutex for spanContexts slice
+	running             *atomic.Bool          // pointer to shared flag that indicates it's time to stop the test
+	numTraces           int                   // how many traces the worker has to generate (only when duration==0)
+	numChildSpans       int                   // how many child spans the worker has to generate per trace
+	propagateContext    bool                  // whether the worker needs to propagate the trace context via HTTP headers
+	statusCode          codes.Code            // the status code set for the child and parent spans
+	totalDuration       types.DurationWithInf // how long to run the test for (overrides `numTraces`)
+	limitPerSecond      rate.Limit            // how many spans per second to generate
+	wg                  *sync.WaitGroup       // notify when done
+	loadSize            int                   // desired minimum size in MB of string data for each generated trace
+	spanDuration        time.Duration         // duration of generated spans
+	numSpanLinks        int                   // number of span links to generate per span
+	addTraceIDAttr      bool                  // whether to add traceId as an attribute to spans
+	random1AttrMaxValue int                   // max value for random1 attribute (0 = disabled)
+	random2AttrMaxValue int                   // max value for random2 attribute (0 = disabled)
+	logger              *zap.Logger
+	allowFailures       bool                // whether to continue on export failures
+	spanContexts        []trace.SpanContext // collection of span contexts for linking
+	spanContextsMu      sync.RWMutex        // mutex for spanContexts slice
 }
 
 const (
@@ -128,10 +129,16 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 			sp.SetAttributes(attribute.String("traceId", sp.SpanContext().TraceID().String()))
 		}
 
-		// Add random attribute if configured
-		if w.randomAttrMaxValue > 0 {
-			randomValue := rand.IntN(w.randomAttrMaxValue)
-			sp.SetAttributes(attribute.String("random", strconv.Itoa(randomValue)))
+		// Add random1 attribute if configured
+		if w.random1AttrMaxValue > 0 {
+			randomValue := rand.IntN(w.random1AttrMaxValue)
+			sp.SetAttributes(attribute.String("random1", strconv.Itoa(randomValue)))
+		}
+
+		// Add random2 attribute if configured
+		if w.random2AttrMaxValue > 0 {
+			randomValue := rand.IntN(w.random2AttrMaxValue)
+			sp.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
 		}
 
 		for j := 0; j < w.loadSize; j++ {
@@ -175,10 +182,16 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 				child.SetAttributes(attribute.String("traceId", child.SpanContext().TraceID().String()))
 			}
 
-			// Add random attribute if configured
-			if w.randomAttrMaxValue > 0 {
-				randomValue := rand.IntN(w.randomAttrMaxValue)
-				child.SetAttributes(attribute.String("random", strconv.Itoa(randomValue)))
+			// Add random1 attribute if configured
+			if w.random1AttrMaxValue > 0 {
+				randomValue := rand.IntN(w.random1AttrMaxValue)
+				child.SetAttributes(attribute.String("random1", strconv.Itoa(randomValue)))
+			}
+
+			// Add random2 attribute if configured
+			if w.random2AttrMaxValue > 0 {
+				randomValue := rand.IntN(w.random2AttrMaxValue)
+				child.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
 			}
 
 			// Store the child span context for potential future linking
