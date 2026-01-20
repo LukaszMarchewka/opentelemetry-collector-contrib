@@ -158,6 +158,7 @@ func run(c *Config, logger *zap.Logger) error {
 			addTraceIDAttr:      c.AddTraceIDAttr,
 			random1AttrMaxValue: c.Random1AttrMaxValue,
 			random2AttrMaxValue: c.Random2AttrMaxValue,
+			staticAttrValue:     c.StaticAttrValue,
 			spanContexts:        make([]trace.SpanContext, 0),
 		}
 

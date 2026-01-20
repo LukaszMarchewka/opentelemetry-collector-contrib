@@ -40,6 +40,7 @@ type worker struct {
 	addTraceIDAttr      bool                  // whether to add traceId as an attribute to spans
 	random1AttrMaxValue int                   // max value for random1 attribute (0 = disabled)
 	random2AttrMaxValue int                   // max value for random2 attribute (0 = disabled)
+	staticAttrValue     string                // static attribute value (empty = disabled)
 	logger              *zap.Logger
 	allowFailures       bool                // whether to continue on export failures
 	spanContexts        []trace.SpanContext // collection of span contexts for linking
@@ -141,6 +142,11 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 			sp.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
 		}
 
+		// Add static attribute if configured
+		if w.staticAttrValue != "" {
+			sp.SetAttributes(attribute.String("static", w.staticAttrValue))
+		}
+
 		for j := 0; j < w.loadSize; j++ {
 			sp.SetAttributes(config.CreateLoadAttribute(fmt.Sprintf("load-%v", j), 1))
 		}
@@ -192,6 +198,11 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 			if w.random2AttrMaxValue > 0 {
 				randomValue := rand.IntN(w.random2AttrMaxValue)
 				child.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
+			}
+
+			// Add static attribute if configured
+			if w.staticAttrValue != "" {
+				child.SetAttributes(attribute.String("static", w.staticAttrValue))
 			}
 
 			// Store the child span context for potential future linking

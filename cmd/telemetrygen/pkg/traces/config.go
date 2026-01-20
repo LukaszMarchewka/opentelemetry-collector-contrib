@@ -25,6 +25,7 @@ type Config struct {
 	AddTraceIDAttr      bool
 	Random1AttrMaxValue int
 	Random2AttrMaxValue int
+	StaticAttrValue     string
 
 	SpanDuration time.Duration
 }
@@ -51,6 +52,7 @@ func (c *Config) Flags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.AddTraceIDAttr, "add-traceid-attr", c.AddTraceIDAttr, "Whether to add traceId as an attribute to each span")
 	fs.IntVar(&c.Random1AttrMaxValue, "random1-attr-max", c.Random1AttrMaxValue, "If set, adds a 'random1' attribute with a random number from 0 to this value (exclusive). If not set or 0, the attribute is not added.")
 	fs.IntVar(&c.Random2AttrMaxValue, "random2-attr-max", c.Random2AttrMaxValue, "If set, adds a 'random2' attribute with a random number from 0 to this value (exclusive). If not set or 0, the attribute is not added.")
+	fs.StringVar(&c.StaticAttrValue, "static-attr", c.StaticAttrValue, "If set, adds a 'static' attribute with this value to each span. If not set or empty, the attribute is not added.")
 }
 
 // SetDefaults sets the default values for the configuration
@@ -70,6 +72,7 @@ func (c *Config) SetDefaults() {
 	c.AddTraceIDAttr = false
 	c.Random1AttrMaxValue = 0
 	c.Random2AttrMaxValue = 0
+	c.StaticAttrValue = ""
 }
 
 // Validate validates the test scenario parameters.
