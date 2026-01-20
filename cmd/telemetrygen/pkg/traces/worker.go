@@ -26,25 +26,29 @@ import (
 )
 
 type worker struct {
-	running             *atomic.Bool          // pointer to shared flag that indicates it's time to stop the test
-	numTraces           int                   // how many traces the worker has to generate (only when duration==0)
-	numChildSpans       int                   // how many child spans the worker has to generate per trace
-	propagateContext    bool                  // whether the worker needs to propagate the trace context via HTTP headers
-	statusCode          codes.Code            // the status code set for the child and parent spans
-	totalDuration       types.DurationWithInf // how long to run the test for (overrides `numTraces`)
-	limitPerSecond      rate.Limit            // how many spans per second to generate
-	wg                  *sync.WaitGroup       // notify when done
-	loadSize            int                   // desired minimum size in MB of string data for each generated trace
-	spanDuration        time.Duration         // duration of generated spans
-	numSpanLinks        int                   // number of span links to generate per span
-	addTraceIDAttr      bool                  // whether to add traceId as an attribute to spans
-	random1AttrMaxValue int                   // max value for random1 attribute (0 = disabled)
-	random2AttrMaxValue int                   // max value for random2 attribute (0 = disabled)
-	staticAttrValue     string                // static attribute value (empty = disabled)
-	logger              *zap.Logger
-	allowFailures       bool                // whether to continue on export failures
-	spanContexts        []trace.SpanContext // collection of span contexts for linking
-	spanContextsMu      sync.RWMutex        // mutex for spanContexts slice
+	running                 *atomic.Bool          // pointer to shared flag that indicates it's time to stop the test
+	numTraces               int                   // how many traces the worker has to generate (only when duration==0)
+	numChildSpans           int                   // how many child spans the worker has to generate per trace
+	propagateContext        bool                  // whether the worker needs to propagate the trace context via HTTP headers
+	statusCode              codes.Code            // the status code set for the child and parent spans
+	totalDuration           types.DurationWithInf // how long to run the test for (overrides `numTraces`)
+	limitPerSecond          rate.Limit            // how many spans per second to generate
+	wg                      *sync.WaitGroup       // notify when done
+	loadSize                int                   // desired minimum size in MB of string data for each generated trace
+	spanDuration            time.Duration         // duration of generated spans
+	numSpanLinks            int                   // number of span links to generate per span
+	addTraceIDAttr          bool                  // whether to add traceId as an attribute to spans
+	componentIdAttrMaxValue int                   // max value for componentId attribute (0 = disabled)
+	changeProbability       int                   // how often stateful componentId changes (1/probability)
+	staticAttrValue         string                // static attribute value (empty = disabled)
+	printTraces             bool                  // whether to print trace information to stdout
+	logger                  *zap.Logger
+	allowFailures           bool                // whether to continue on export failures
+	spanContexts            []trace.SpanContext // collection of span contexts for linking
+	spanContextsMu          sync.RWMutex        // mutex for spanContexts slice
+	state                   string              // current state value (e.g., state1, state2)
+	traceCounterPerCompId   map[string]int      // counter for traces generated per componentId
+	traceCounterMu          sync.Mutex          // mutex for traceCounterPerCompId map
 }
 
 const (
@@ -99,6 +103,36 @@ func (w *worker) generateSpanLinks() []trace.Link {
 	return links
 }
 
+// getState returns the current state value and updates it if needed based on componentId
+// This should be called once per trace (not per span)
+func (w *worker) getState(componentId string) string {
+	if w.changeProbability <= 0 || w.componentIdAttrMaxValue <= 0 {
+		return ""
+	}
+
+	w.traceCounterMu.Lock()
+	defer w.traceCounterMu.Unlock()
+
+	// Increment the trace counter for this componentId
+	w.traceCounterPerCompId[componentId]++
+	count := w.traceCounterPerCompId[componentId]
+
+	// Compute the current state based on count / changeProbability
+	//currentState := count / w.changeProbability
+
+	// Check if we need to update the state (when state changes)
+	if count%w.changeProbability == 0 {
+		// Reset counter to 0 when state changes
+		//w.traceCounterPerCompId[componentId] = 0
+		w.state = fmt.Sprintf("state%d", count)
+	} else if w.state == "" {
+		// Initialize state if it's empty
+		w.state = fmt.Sprintf("state%d", count)
+	}
+
+	return w.state
+}
+
 func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 	tracer := otel.Tracer("telemetrygen")
 	limiter := rate.NewLimiter(w.limitPerSecond, 1)
@@ -130,16 +164,26 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 			sp.SetAttributes(attribute.String("traceId", sp.SpanContext().TraceID().String()))
 		}
 
-		// Add random1 attribute if configured
-		if w.random1AttrMaxValue > 0 {
-			randomValue := rand.IntN(w.random1AttrMaxValue)
-			sp.SetAttributes(attribute.String("random1", strconv.Itoa(randomValue)))
+		// Generate componentId first so we can use it for state calculation
+		var componentId string
+		if w.componentIdAttrMaxValue > 0 {
+			randomValue := rand.IntN(w.componentIdAttrMaxValue)
+			componentId = strconv.Itoa(randomValue)
+			sp.SetAttributes(attribute.String("componentId", componentId))
 		}
 
-		// Add random2 attribute if configured
-		if w.random2AttrMaxValue > 0 {
-			randomValue := rand.IntN(w.random2AttrMaxValue)
-			sp.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
+		// Add changeProbability attribute if configured
+		if w.changeProbability > 0 {
+			sp.SetAttributes(attribute.String("changeProbability", strconv.Itoa(w.changeProbability)))
+		}
+
+		// Add state if configured (based on componentId)
+		var state string
+		if componentId != "" {
+			state = w.getState(componentId)
+			if state != "" {
+				sp.SetAttributes(attribute.String("state", state))
+			}
 		}
 
 		// Add static attribute if configured
@@ -153,6 +197,22 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 
 		// Store the parent span context for potential future linking
 		w.addSpanContext(sp.SpanContext())
+
+		// Print trace information if enabled
+		if w.printTraces {
+			fmt.Printf("\n=== Trace #%d ===\n", i+1)
+			fmt.Printf("TraceID: %s\n", sp.SpanContext().TraceID().String())
+			fmt.Printf("Parent Span:\n")
+			fmt.Printf("  SpanID: %s\n", sp.SpanContext().SpanID().String())
+			fmt.Printf("  Name: lets-go\n")
+			fmt.Printf("  Kind: Client\n")
+			if componentId != "" {
+				fmt.Printf("  ComponentId: %s\n", componentId)
+			}
+			if state != "" {
+				fmt.Printf("  State: %s\n", state)
+			}
+		}
 
 		childCtx := ctx
 		if w.propagateContext {
@@ -188,16 +248,19 @@ func (w *worker) simulateTraces(telemetryAttributes []attribute.KeyValue) {
 				child.SetAttributes(attribute.String("traceId", child.SpanContext().TraceID().String()))
 			}
 
-			// Add random1 attribute if configured
-			if w.random1AttrMaxValue > 0 {
-				randomValue := rand.IntN(w.random1AttrMaxValue)
-				child.SetAttributes(attribute.String("random1", strconv.Itoa(randomValue)))
+			// Add componentId attribute if configured (same as parent)
+			if componentId != "" {
+				child.SetAttributes(attribute.String("componentId", componentId))
 			}
 
-			// Add random2 attribute if configured
-			if w.random2AttrMaxValue > 0 {
-				randomValue := rand.IntN(w.random2AttrMaxValue)
-				child.SetAttributes(attribute.String("random2", strconv.Itoa(randomValue)))
+			// Add changeProbability attribute if configured
+			if w.changeProbability > 0 {
+				child.SetAttributes(attribute.String("changeProbability", strconv.Itoa(w.changeProbability)))
+			}
+
+			// Add state if configured (same value as parent span)
+			if state != "" {
+				child.SetAttributes(attribute.String("state", state))
 			}
 
 			// Add static attribute if configured
